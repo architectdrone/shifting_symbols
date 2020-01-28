@@ -1,9 +1,10 @@
-import random
 import time
 import copy
+import itertools
 
 symbols = ['<', '>', '^', '/', '#']
-STARTING_TAPE = [random.choice(symbols) for i in range(10)]
+STARTING_TAPE = ['<', '<', '<', '<', '>', '#']
+NUMBER_OF_SYMBOLS = 6
 
 def inc_wrap(pos, list):
     return (pos+1)%(len(list))
@@ -109,6 +110,38 @@ class ShiftingSymbols():
         
         return stasis_result
 
-myTest = ShiftingSymbols(STARTING_TAPE, max_iterations=500)
-results = myTest.run(show=False)
-print(results)
+if STARTING_TAPE == []:
+    type0_number = 0
+    homogenous_number = 0
+    simple_number = 0
+    type1_number = 0
+    unknown_number = 0
+    unknowns = []
+    total = 0
+
+    for i in itertools.combinations_with_replacement(symbols, NUMBER_OF_SYMBOLS):
+        total+=1
+        myTest = ShiftingSymbols(list(i), max_iterations=5000)
+        results = myTest.run(show=False)
+        if results['found']:
+            if results['type'] == 0:
+                type0_number+=1
+                if results['homogenous']:
+                    homogenous_number+=1
+                if results['simple']:
+                    simple_number+=1
+            elif results['type'] == 1:
+                type1_number+=1
+        else:
+            unknown_number+=1
+            unknowns.append(results['initial'])
+
+    print("TEST COMPLETE")
+    print(f"0: {type0_number/total}")
+    print(f"1: {type1_number/total}")
+    print(f"?: {unknown_number/total}")
+    print(f"Unknowns: {unknowns}")
+
+else:
+    myTest = ShiftingSymbols(STARTING_TAPE, max_iterations=5000)
+    myTest.run()
