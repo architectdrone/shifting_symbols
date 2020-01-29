@@ -3,8 +3,8 @@ import copy
 import itertools
 
 symbols = ['<', '>', '^', '/', '#']
-STARTING_TAPE = ['<', '<', '<', '<', '>', '#']
-NUMBER_OF_SYMBOLS = 6
+STARTING_TAPE = []
+NUMBER_OF_SYMBOLS = 10
 
 def inc_wrap(pos, list):
     return (pos+1)%(len(list))
@@ -45,11 +45,13 @@ class ShiftingSymbols():
             
             head = inc_wrap(head, self.tape)
             
-            stasis_result = self.stasis_check(self.tape)
+            stasis_result = self.stasis_check(self.tape, head)
             if stasis_result['found']:
+                stasis_result['convergence'] = runs
                 return stasis_result
             elif runs >= self.max_iterations:
                 stasis_result['initial'] = self.initial_tape
+                stasis_result['final'] = self.tape
                 return stasis_result
 
             if show:
@@ -64,7 +66,7 @@ class ShiftingSymbols():
                 input(". ")
                 print('\x1bc')
     
-    def stasis_check(self, tape):
+    def stasis_check(self, tape, head):
         '''
         Perform known checks for stasis
         '''
@@ -72,30 +74,33 @@ class ShiftingSymbols():
         stasis_result = {}
 
         #Type 0
+        #The tape has no means to self modify.
         simple = '#' not in tape
         homogenous = len(set(tape)) == 1
         type0 = simple or homogenous
 
         #Type 1
-        x_axis = 0
-        y_axis = 0
-
-        tape_without_pounds = []
-        for i in tape:
-            if i != '#':
-                tape_without_pounds.append(i)
-
-        for current_symbol in tape_without_pounds:
-            if current_symbol == '>':
-                x_axis+=1
-            elif current_symbol == '<':
-                x_axis-=1
-            elif current_symbol == '/':
-                y_axis-=1
-            elif current_symbol == '^':
-                y_axis+=1
+        #The tape has the means to self modify, but cannot.
+        type1 = False
+        directional_vectors = self.get_all_directional_vectors(tape)
+        all_zero_vectors = all(i == (0,0) for i in directional_vectors)
         
-        type1 = x_axis == 0 and y_axis == 0
+        loopsize = 0
+        if all_zero_vectors: #Loop Size = 0
+            type1 = True
+        elif len(directional_vectors) == 1: #Higher Order Loops.
+            shift_vector = directional_vectors[0]
+            initial_position = self.get_position_vector(tape, head)
+            current_shifted_position = initial_position
+            while True:
+                loopsize+=1
+                current_shifted_position = self.convert_to_position_vector(shift_vector, current_shifted_position, tape)
+                current_positon = self.get_position_vector(tape, current_shifted_position[0])
+                if current_shifted_position != current_positon:
+                    break
+                elif current_shifted_position == initial_position:
+                    type1 = True
+                    break
 
         if (type0):
             stasis_result['found'] = True
@@ -105,10 +110,70 @@ class ShiftingSymbols():
         elif (type1):
             stasis_result['found'] = True
             stasis_result['type'] = 1
+            stasis_result['loopsize'] = loopsize
         else:
             stasis_result['found'] = False
         
         return stasis_result
+
+    def get_position_vector(self, tape, position):
+        return (position, symbols.index(tape[position]))
+    
+    def convert_to_position_vector(self, vec1, vec2, tape):
+        return ((vec1[0]+vec2[0])%len(tape), (vec1[1]+vec2[1])%len(tape))
+    
+    # def contiguous_pounds(self, tape):
+    #     '''
+    #     Returns true if there is one region of pound signs.
+    #     '''
+
+    #     grouped = [i[0] for i in itertools.groupby(tape)]
+    #     if grouped.count('#') == 1:
+    #         return True
+    #     elif grouped.count('#') and grouped[0] == '#' and grouped[-1] == '#':
+    #         return True
+    #     else:
+    #         return False
+    
+    def get_all_directional_vectors(self, tape):
+        '''
+        Extracts all directional vectors separated by pounds from the tape.
+        '''
+
+        x_axis = 0
+        y_axis = 0
+        reported_pound = False
+
+        all_directional_vectors = []
+        while True:
+            current_symbol = tape[0]
+            tape = tape[1:]
+
+            if current_symbol == '>':
+                reported_pound = False
+                x_axis+=1
+            elif current_symbol == '<':
+                reported_pound = False
+                x_axis-=1
+            elif current_symbol == '/':
+                reported_pound = False
+                y_axis-=1
+            elif current_symbol == '^':
+                reported_pound = False
+                y_axis+=1
+            elif current_symbol == '#' and reported_pound == False:
+                all_directional_vectors.append((x_axis,y_axis))
+                x_axis = y_axis = 0
+            
+            if tape == []:
+                if current_symbol != '#': #This means that the last directional vector is actually part of the first, wack I know
+                    if all_directional_vectors == []: # Unless no directional vectors were ever added.
+                        all_directional_vectors.append((x_axis,y_axis))
+                    first_vector = all_directional_vectors[0]
+                    all_directional_vectors[0] = (first_vector[0]+x_axis, first_vector[1]+y_axis)
+                break
+        
+        return all_directional_vectors
 
 if STARTING_TAPE == []:
     type0_number = 0
@@ -117,6 +182,7 @@ if STARTING_TAPE == []:
     type1_number = 0
     unknown_number = 0
     unknowns = []
+    total_convergence = 0
     total = 0
 
     for i in itertools.combinations_with_replacement(symbols, NUMBER_OF_SYMBOLS):
@@ -132,11 +198,14 @@ if STARTING_TAPE == []:
                     simple_number+=1
             elif results['type'] == 1:
                 type1_number+=1
+            if results['convergence'] != 1:
+                total_convergence+=results['convergence']
         else:
             unknown_number+=1
-            unknowns.append(results['initial'])
+            unknowns.append(results['final'])
 
     print("TEST COMPLETE")
+    print(f"Average to non-trivial convergence: {total_convergence/total}")
     print(f"0: {type0_number/total}")
     print(f"1: {type1_number/total}")
     print(f"?: {unknown_number/total}")
@@ -144,4 +213,4 @@ if STARTING_TAPE == []:
 
 else:
     myTest = ShiftingSymbols(STARTING_TAPE, max_iterations=5000)
-    myTest.run()
+    print(myTest.run())
