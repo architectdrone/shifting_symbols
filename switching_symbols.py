@@ -1,6 +1,7 @@
 import time
 import copy
 import itertools
+import numpy as np
 
 symbols = ['<', '>', '^', '/', '#']
 STARTING_TAPE = []
@@ -174,6 +175,47 @@ class ShiftingSymbols():
                 break
         
         return all_directional_vectors
+
+class Tape():
+    def __init__(self, inital_array):
+        self.initial_array = inital_array
+
+    def getTapePoint(self, x):
+        global symbols
+        y = symbols.index(self.initial_array[x])
+        return TapeVector(x, y, self, position_vector=True)
+
+    def getVectors(self):
+        '''
+        Returns shift vectors, the orienting vector, and whatever vector is next.
+        '''
+        up_vector = TapeVector(0, 1, self)
+        down_vector = TapeVector(0, -1, self)
+        left_vector = TapeVector(-1, 0, self)
+        right_vector = TapeVector(1, 0, self)
+
+    def getSize(self):
+        return len(self.initial_array)
+
+class TapeVector():
+    def __init__(self, x, y, tape, symbol_size = 5, position_vector = False):
+        self.vector = np.array([x, y])
+        self.tape_size = tape.getSize()
+        self.symbol_size = symbol_size
+        self.position_vector = position_vector
+        if self.position_vector:
+            _convertToPosition()
+
+    def _convertToPosition(self):
+        self.vector[0,0] = self.vector[0,0]%self.tape_size
+        self.vector[0,1] = self.vector[0,1]%self.symbol_size
+        
+    def __add__(self, tv2):
+        new_vector = self.vector+tv2.vector
+        if self.position_vector or tv2.position_vector:
+            return TapeVector(new_vector[0,0], new_vector[0,1], self.tape, position_vector=True)
+        else:
+            return TapeVector(new_vector[0,0], new_vector[0,1], self.tape)
 
 if STARTING_TAPE == []:
     type0_number = 0
